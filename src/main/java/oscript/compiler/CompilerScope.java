@@ -392,12 +392,7 @@ class Member
       }
     } );
   }
-  
-//  protected void finalize()
-//  {
-//    System.err.println(name + ": slot=" + slot);
-//  }
-  
+
   /**
    * Called when we decide that this member should be cached.
    */

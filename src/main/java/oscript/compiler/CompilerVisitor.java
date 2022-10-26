@@ -453,7 +453,6 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
     // evaluate expression:
     n.f1.accept(this);
     setRetValOnStack(false);
-    
     // check that the user isn't trying to throw (undefined)
     il.append( new INVOKESTATIC( ctx.methodref( 
       "oscript.interpreter.EvaluateVisitor",
@@ -2328,7 +2327,7 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
       "<init>",
       "(Loscript/data/Scope;" +
       "Loscript/data/Value;" +
-      "Loscript/data/Function$FunctionData;)V" 
+      "Loscript/data/FunctionData;)V" 
     ) ) );
     
     setRetValOnStack(true);

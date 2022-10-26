@@ -50,12 +50,6 @@ public class CompilerContext
   public static int failed = 0;
   public static int succeeded = 0;
   
-  
-  /**
-   * Used to load a class from a <code>JavaClass</code>.
-   */
-  private CompilerClassLoader loader;
-  
   /**
    * The index of the last <tt>evalNode<i>X</i>()</tt> method.
    */
@@ -165,8 +159,7 @@ public class CompilerContext
   private CompilerContext( String name )
   {
     this.name = name;
-    this.loader = new CompilerClassLoader();
-    this.className = loader.makeClassName(name);
+    this.className = name;
     
     cg = new ClassGen( 
       className,
@@ -262,7 +255,8 @@ public class CompilerContext
   {
     try
     {
-      Class c = loader.makeClass( className, classdata );
+      // use class data name | 05.10.2022
+      Class c = (Class)OscriptHost.me.compilerMakeClass(classdata);
       CompiledNodeEvaluator result = (CompiledNodeEvaluator)(c.getConstructor().newInstance());
       succeeded++;
       return result;
@@ -743,9 +737,9 @@ il.append( InstructionConst.ARETURN );
                          boolean hasVarInScope, boolean hasFxnInScope,
                          Value comment )
   {
-    int idx = makeField( "fd", Function.FunctionData.class );
+    int idx = makeField( "fd", FunctionData.class );
     
-    initIl.append( new NEW( cp.addClass("oscript.data.Function$FunctionData") ) );
+    initIl.append( new NEW( cp.addClass("oscript.data.FunctionData") ) );
     initIl.append( InstructionConst.DUP );
     pushSymbol( initIl, Symbol.getSymbol(id).castToString() );
     pushInstanceConstant( initIl, argIds );
@@ -757,7 +751,7 @@ il.append( InstructionConst.ARETURN );
     initIl.append( new PUSH( cp, hasFxnInScope ) );
     pushInstanceConstant( initIl, comment );
     initIl.append( new INVOKESPECIAL( methodref(
-      "oscript.data.Function$FunctionData",
+      "oscript.data.FunctionData",
       "<init>",
       "(I[IZLoscript/NodeEvaluator;Loscript/NodeEvaluator;Loscript/NodeEvaluator;ZZLoscript/data/Value;)V"
     ) ) );

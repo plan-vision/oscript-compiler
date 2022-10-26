@@ -17,11 +17,8 @@
  */
 
 package oscript.compiler;
-
-import java.nio.charset.StandardCharsets;
-
+import oscript.OscriptHost;
 import oscript.syntaxtree.Node;
-import oscript.util.Base62;
 
 /**
  * A front end for the compiler, making it match the
@@ -33,17 +30,12 @@ public class CompiledNodeEvaluatorFactory implements
 		oscript.NodeEvaluatorFactory {
 	
 	public oscript.NodeEvaluator createNodeEvaluator(String name, Node node) {
-		byte[] b = CompilerContext.compileNode(nodeNameToClassName(name), node); 
+		byte[] b = CompilerContext.compileNode(OscriptHost.me.nodeNameToClassName(name), node); 
 		return createNodeEvaluator(name,b);
 	}
 
 	public oscript.NodeEvaluator createNodeEvaluator(String name, byte[] classdata) {
-		return CompilerContext.compileNode(nodeNameToClassName(name), classdata);
+		return CompilerContext.compileNode(OscriptHost.me.nodeNameToClassName(name), classdata);
 	}
 
-	
-	public static final String nodeNameToClassName(String name) 
-	{
-		return "B62"+Base62.encode(name.getBytes(StandardCharsets.UTF_8));
-	}
 }
