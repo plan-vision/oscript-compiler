@@ -25,7 +25,6 @@ import oscript.data.*;
 import oscript.exceptions.*;
 import oscript.util.OpenHashSymbolTable;
 
-
 // The Bytecode Engineerign Library
 import org.apache.bcel.generic.*;
 
@@ -249,23 +248,6 @@ public class CompilerContext
       throw new ProgrammingErrorException(e);
     }
     return null;
-  }
-
-  private CompiledNodeEvaluator compileNodeImpl( byte[] classdata)
-  {
-    try
-    {
-      // use class data name | 05.10.2022
-      Class c = (Class)OscriptHost.me.compilerMakeClass(classdata);
-      CompiledNodeEvaluator result = (CompiledNodeEvaluator)(c.getConstructor().newInstance());
-      succeeded++;
-      return result;
-    } catch(Throwable e)
-    {
-      // treat this as a more fatal sort of error than LinkageError
-      compileNodeException(e);
-      throw new ProgrammingErrorException(e);
-    }
   }
 
   private void compileNodeException( Throwable e )
@@ -829,7 +811,40 @@ il.append( InstructionConst.ARETURN );
     else
       throw new ProgrammingErrorException("bad primitive type: " + c);
   }
-  
+
+  //---------------------------------------------------------------------
+  public static interface HiddenClassByteLoaderApi {
+	  public Class load(byte[] classdata) throws IllegalAccessException; 
+  }
+  private final static HiddenClassByteLoaderApi classDataLoader;
+  static {
+	  HiddenClassByteLoaderApi api = null;
+	  try 
+	  {
+		  api=(HiddenClassByteLoaderApi) Class.forName("OscriptHiddenClassBytesLoader").
+				  getMethod("getImpl").
+				  invoke(null);
+	  } catch (Throwable e) {
+		  OscriptHost.me.error(e+"");
+	  }
+	  classDataLoader = api;
+  }
+  //---------------------------------------------------------------------
+  private CompiledNodeEvaluator compileNodeImpl( byte[] classdata)
+  {
+    try
+    {
+      Class c = classDataLoader.load(classdata);
+      CompiledNodeEvaluator result = (CompiledNodeEvaluator)(c.getConstructor().newInstance());
+      succeeded++;
+      return result;
+    } catch(Throwable e)
+    {
+      // treat this as a more fatal sort of error than LinkageError
+      compileNodeException(e);
+      throw new ProgrammingErrorException(e);
+    }
+  }
 }
 
 
