@@ -2,10 +2,15 @@ package oscript.compiler;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.JarURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
+import java.util.jar.JarEntry;
+
 import oscript.OscriptHost;
 
 public final class JavaPackageReader 
@@ -31,18 +36,40 @@ public final class JavaPackageReader
 	 */
 	private static Class[] getClasses(String packageName)
 	        throws ClassNotFoundException, IOException {
+		
 	    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
 	    String path = packageName.replace('.', '/');
 	    Enumeration<URL> resources = classLoader.getResources(path);
 	    List<File> dirs = new ArrayList<File>();
+	    List<URL> jars = new ArrayList<URL>();
 	    while (resources.hasMoreElements()) {
 	        URL resource = resources.nextElement();
-	        dirs.add(new File(resource.getFile()));
+	        if (resource.getProtocol().equals("jar")) {
+	        	jars.add(resource);
+	        } else {
+		        dirs.add(new File(resource.getFile()));
+	        }
 	    }
 	    ArrayList<Class> classes = new ArrayList<Class>();
-	    for (File directory : dirs) {
-	        classes.addAll(findClasses(directory, packageName));
+	    HashSet<String> used = new HashSet();
+	    // SCAN JARS 
+	    for (URL jar : jars) {
+	    	 JarURLConnection jarConnection = (JarURLConnection)jar.openConnection();
+	    	 //jarConnection.connect();
+	    	 String pp = path+"/";
+	    	 for (JarEntry e : Collections.list(jarConnection.getJarFile().entries())) {
+	    		 String name = e.getName();
+	    		 if (name.endsWith(".class") && name.startsWith(pp) && !name.contains("$")) {
+	    			 String cname = name.substring(0, name.length() - 6).replace('/', '.');
+	    			 if (used.add(cname)) 
+		    			 classes.add(Class.forName(cname));
+	    		 }
+	    	 }
+
 	    }
+	    // SCAN DIRS
+	    for (File directory : dirs) 
+	        classes.addAll(findClasses(directory, packageName,used));
 	    return classes.toArray(new Class[classes.size()]);
 	}
 
@@ -54,7 +81,7 @@ public final class JavaPackageReader
 	 * @return The classes
 	 * @throws ClassNotFoundException
 	 */
-	private static List<Class> findClasses(File directory, String packageName) throws ClassNotFoundException {
+	private static List<Class> findClasses(File directory, String packageName,HashSet<String> used) throws ClassNotFoundException {
 	    List<Class> classes = new ArrayList<Class>();
 	    if (!directory.exists()) {
 	        return classes;
@@ -63,9 +90,11 @@ public final class JavaPackageReader
 	    for (File file : files) {
 	    	String name = file.getName();
 	        if (file.isDirectory()) {
-	            classes.addAll(findClasses(file, packageName + "." + name));
+	            classes.addAll(findClasses(file, packageName + "." + name,used));
 	        } else if (name.endsWith(".class") && name.indexOf("$") < 0) {
-	            classes.add(Class.forName(packageName + '.' + name.substring(0, name.length() - 6)));
+	        	String cname = packageName + '.' + name.substring(0, name.length() - 6);
+	        	if (used.add(cname))
+	        		classes.add(Class.forName(cname));
 	        }
 	    }
 	    return classes;
