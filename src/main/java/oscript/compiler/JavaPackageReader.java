@@ -93,8 +93,12 @@ public final class JavaPackageReader
 	            classes.addAll(findClasses(file, packageName + "." + name,used));
 	        } else if (name.endsWith(".class") && name.indexOf("$") < 0) {
 	        	String cname = packageName + '.' + name.substring(0, name.length() - 6);
-	        	if (used.add(cname))
-	        		classes.add(Class.forName(cname));
+	        	if (used.add(cname)) {
+	        		try {
+		        		Class c = Class.forName(cname);
+		        		classes.add(c);
+	        		} catch (Throwable e) {}
+	        	}
 	        }
 	    }
 	    return classes;

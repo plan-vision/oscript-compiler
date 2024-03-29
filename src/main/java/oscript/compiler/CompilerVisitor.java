@@ -189,6 +189,7 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
   public void visit( NodeOptional n )        { throw new ProgrammingErrorException("unimplemented"); }
   public void visit( NodeSequence n )        { throw new ProgrammingErrorException("unimplemented"); }
   
+  public static boolean LINE_NUMBER_ENABLED = true; 
   /*=======================================================================*/
   private NodeToken         NodeToken_lastToken;
   private Vector            NodeToken_lastSpecials;
@@ -208,7 +209,7 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
     if( n.specialTokens != null )
       NodeToken_lastSpecials = n.specialTokens;
     
-    if(true) // XXX we should be able to enable/disable inserting this extra code at runtime
+    if(LINE_NUMBER_ENABLED) // XXX we should be able to enable/disable inserting this extra code at runtime
     {
       // we only need to insert code to update the line # if the line # changed
       // or if there is a branch inst target between here and the last time we
