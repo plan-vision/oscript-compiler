@@ -1221,7 +1221,7 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
       il.append( new INVOKEVIRTUAL( ctx.methodref(
         "oscript.util.StackFrame",
         "allocateMemberTable",
-        "(I)Loscript/util/MemberTable;"
+        "(I)Loscript/util/MemberTableImpl;"
       ) ) );
       allocateMemberTable_allocateFromStack = false;
     }
