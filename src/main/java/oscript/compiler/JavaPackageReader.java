@@ -3,105 +3,97 @@ package oscript.compiler;
 import java.io.File;
 import java.io.IOException;
 import java.net.JarURLConnection;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 import oscript.OscriptHost;
 
-public final class JavaPackageReader 
-{
-	public static Class[] getPackageClasses(String packageName) 
-	{
-		try 
-		{
-			return getClasses(packageName);
-		} catch (ClassNotFoundException | IOException e) {
-			OscriptHost.me.error(e+"");
-			return new Class[0];
-		} 
-	}
+public final class JavaPackageReader {
+    public static String[] getPackageClasses(String packageName) {
+        try {
+            String[] classes=getClasses(packageName,true,true);
+            return classes;
+        } catch (IOException e) {
+            OscriptHost.me.error(e + "");
+            return new String[0];
+        }
+    }
 
-	/**
-	 * Scans all classes accessible from the context class loader which belong to the given package and subpackages.
-	 *
-	 * @param packageName The base package
-	 * @return The classes
-	 * @throws ClassNotFoundException
-	 * @throws IOException
-	 */
-	private static Class[] getClasses(String packageName)
-	        throws ClassNotFoundException, IOException {
-		
-	    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-	    String path = packageName.replace('.', '/');
-	    Enumeration<URL> resources = classLoader.getResources(path);
-	    List<File> dirs = new ArrayList<File>();
-	    List<URL> jars = new ArrayList<URL>();
-	    while (resources.hasMoreElements()) {
-	        URL resource = resources.nextElement();
-	        if (resource.getProtocol().equals("jar")) {
-	        	jars.add(resource);
-	        } else {
-		        dirs.add(new File(resource.getFile()));
-	        }
-	    }
-	    ArrayList<Class> classes = new ArrayList<Class>();
-	    HashSet<String> used = new HashSet();
-	    // SCAN JARS 
-	    for (URL jar : jars) {
-	    	 JarURLConnection jarConnection = (JarURLConnection)jar.openConnection();
-	    	 //jarConnection.connect();
-	    	 String pp = path+"/";
-	    	 for (JarEntry e : Collections.list(jarConnection.getJarFile().entries())) {
-	    		 String name = e.getName();
-	    		 if (name.endsWith(".class") && name.startsWith(pp) && !name.contains("$")) {
-	    			 String cname = name.substring(0, name.length() - 6).replace('/', '.');
-	    			 if (used.add(cname)) 
-		    			 classes.add(Class.forName(cname));
-	    		 }
-	    	 }
+    public static String[] getClasses(String packageName, boolean includeInner, boolean recursive) throws IOException {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        String path = packageName.replace('.', '/');
 
-	    }
-	    // SCAN DIRS
-	    for (File directory : dirs) 
-	        classes.addAll(findClasses(directory, packageName,used));
-	    return classes.toArray(new Class[classes.size()]);
-	}
+        Enumeration<URL> resources = cl.getResources(path);
+        Set<String> names = new LinkedHashSet<>();
 
-	/**
-	 * Recursive method used to find all classes in a given directory and subdirs.
-	 *
-	 * @param directory   The base directory
-	 * @param packageName The package name for classes found inside the base directory
-	 * @return The classes
-	 * @throws ClassNotFoundException
-	 */
-	private static List<Class> findClasses(File directory, String packageName,HashSet<String> used) throws ClassNotFoundException {
-	    List<Class> classes = new ArrayList<Class>();
-	    if (!directory.exists()) {
-	        return classes;
-	    }
-	    File[] files = directory.listFiles();
-	    for (File file : files) {
-	    	String name = file.getName();
-	        if (file.isDirectory()) {
-	            classes.addAll(findClasses(file, packageName + "." + name,used));
-	        } else if (name.endsWith(".class") && name.indexOf("$") < 0) {
-	        	String cname = packageName + '.' + name.substring(0, name.length() - 6);
-	        	if (used.add(cname)) {
-	        		try {
-		        		Class c = Class.forName(cname);
-		        		classes.add(c);
-	        		} catch (Throwable e) {}
-	        	}
-	        }
-	    }
-	    return classes;
-	}
+        while (resources.hasMoreElements()) {
+            URL url = resources.nextElement();
+            String protocol = url.getProtocol();
+
+            if ("jar".equals(protocol)) {
+                // Example: jar:file:/.../lib.jar!/com/foo/bar
+                JarURLConnection conn = (JarURLConnection) url.openConnection();
+                try (JarFile jar = conn.getJarFile()) {
+                    String prefix = path + "/";
+                    jar.stream().map(JarEntry::getName).filter(n -> n.endsWith(".class"))
+                            .filter(n -> n.startsWith(prefix))
+                            .filter(n -> recursive || nextSlashAfter(n, prefix.length()) < 0)
+                            .filter(n -> !n.endsWith("module-info.class"))
+                            .filter(n -> !n.endsWith("package-info.class"))
+                            .filter(n -> includeInner || n.indexOf('$', prefix.length()) < 0).forEach(n -> {
+                                String cls = n.substring(0, n.length() - 6).replace('/', '.');
+                                names.add(cls);
+                            });
+                }
+            } else if ("file".equals(protocol)) {
+                // Convert to Path safely (handles spaces/UTF-8)
+                Path _root;
+                try {
+                    _root = Paths.get(url.toURI());
+                } catch (URISyntaxException e) {
+                    _root = Paths.get(URLDecoder.decode(url.getPath(), "UTF-8"));
+                }
+                final Path root = _root;
+                int maxDepth = recursive ? Integer.MAX_VALUE : 1;
+                try (java.util.stream.Stream<Path> stream = Files.find(root, maxDepth,
+                        (p, attrs) -> attrs.isRegularFile() && p.getFileName().toString().endsWith(".class"))) {
+
+                    stream.forEach(p -> {
+                        Path rel = root.relativize(p);
+                        String relStr = rel.toString().replace(File.separatorChar, '/');
+                        if (relStr.endsWith("module-info.class") || relStr.endsWith("package-info.class"))
+                            return;
+                        if (!includeInner && relStr.indexOf('$') >= 0)
+                            return;
+
+                        String simple = relStr.substring(0, relStr.length() - 6); // drop .class
+                        String fqcn = packageName + (simple.isEmpty() ? "" : "." + simple.replace('/', '.'));
+                        names.add(fqcn);
+                    });
+                }
+            }
+        }
+        // Stable order (optional)
+        List<String> sorted = new ArrayList<>(names);
+        Collections.sort(sorted);
+        return sorted.toArray(new String[0]);
+    }
+
+    private static int nextSlashAfter(String s, int from) {
+        int i = s.indexOf('/', from);
+        return i;
+    }
 
 }
