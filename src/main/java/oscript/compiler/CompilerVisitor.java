@@ -33,7 +33,6 @@ import oscript.translator.*;
 import org.apache.bcel.generic.*;
 import org.apache.bcel.Const;
 
-import java.util.Vector;
 import java.util.LinkedList;
 import java.util.Iterator;
 
@@ -52,6 +51,7 @@ import java.util.Iterator;
  */
 public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.OscriptParserConstants
 {
+	
   /**
    * The instruction list which becomes the code of the <code>evalNode</code>
    * method which is generated.
@@ -189,10 +189,9 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
   public void visit( NodeOptional n )        { throw new ProgrammingErrorException("unimplemented"); }
   public void visit( NodeSequence n )        { throw new ProgrammingErrorException("unimplemented"); }
   
-  public static boolean LINE_NUMBER_ENABLED = true; 
+  public static final boolean LINE_NUMBER_ENABLED = false; // DISABLE for VSC! 
   /*=======================================================================*/
   private NodeToken         NodeToken_lastToken;
-  private Vector            NodeToken_lastSpecials;
   private int               NodeToken_lastBeginLine = -1;
   private InstructionHandle NodeToken_lastBranchTarget = null;
   
@@ -206,8 +205,8 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
   {
     NodeToken_lastToken = n;
     
-    if( n.specialTokens != null )
-      NodeToken_lastSpecials = n.specialTokens;
+    /*if( n.specialTokens != null )
+      NodeToken_lastSpecials = n.specialTokens;*/
     
     if(LINE_NUMBER_ENABLED) // XXX we should be able to enable/disable inserting this extra code at runtime
     {
@@ -1210,7 +1209,7 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
    * If set to true, the code that the member-table is created for should
    * take care to call {@link MemberTable#free()}
    */
-  private boolean allocateMemberTable_allocateFromStack = false;
+ private boolean allocateMemberTable_allocateFromStack = false;
   
   private void allocateMemberTable( int sz )
   {
@@ -1220,13 +1219,13 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
       ctx.pushInt( il, sz );
       il.append( new INVOKEVIRTUAL( ctx.methodref(
         "oscript.util.StackFrame",
-        "allocateMemberTable",
-        "(I)Loscript/util/MemberTableImpl;"
+        "allocateMemberTable", 
+        "(I)Loscript/util/MemberTable;" 
       ) ) );
       allocateMemberTable_allocateFromStack = false;
     }
     else
-    {
+    { 
       il.append( new NEW( ctx.cp.addClass("oscript.data.OArray") ) );
       il.append( InstructionConst.DUP );
       ctx.pushInt( il, sz );
@@ -2297,18 +2296,6 @@ public class CompilerVisitor implements oscript.visitor.Visitor, oscript.parser.
       
       // just in case, to get the specials...
       handle(n.f0);
-      
-      // the syntaxtree won't change, so we only need to parse the comment once:
-      synchronized(n)
-      {
-        if( ! n.commentParsed )
-        {
-          n.commentParsed = true;
-          if( NodeToken_lastSpecials != null )
-            n.comment = Function.extractJavadocComment( NodeToken_lastSpecials, oname, argIds );
-        }
-      }
-      
       ctx.pushFunctionData( 
         il,
         Symbol.getSymbol(name).getId(),
