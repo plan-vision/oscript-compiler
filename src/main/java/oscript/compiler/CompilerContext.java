@@ -226,28 +226,12 @@ public class CompilerContext
       succeeded++;
       return bytes;
     }
-    catch(LinkageError e)
-    {
-      /* this means we hit a bug or limitation of the compiler:
-       *
-       * note: we can hit this for method bodies that are too big,
-       *       so don't treat as fatal error
-       */
-      compileNodeException(e);
-    }
-    catch(ClassGenException e)
-    {
-      /* this means we hit a bug or limitation of the compiler:
-       */
-      compileNodeException(e);
-    }
     catch(Throwable e)
     {
       // treat this as a more fatal sort of error than LinkageError
       compileNodeException(e);
       throw new ProgrammingErrorException(e);
     }
-    return null;
   }
 
   private void compileNodeException( Throwable e )
